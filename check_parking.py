@@ -20,7 +20,8 @@ from playwright.sync_api import sync_playwright
  
 URL = "https://kundenportal.parken-mannheim.de/iPCP/contract/create?t=2"
 OBJEKT = os.environ.get("OBJEKT", "Klinikum")
-MONATE_VORAUS = int(os.environ.get("MONATE_VORAUS", "3"))
+# Das Portal erlaubt nur 1 Monat Vorlauf -> aktueller + nächster Monat reichen
+MONATE_VORAUS = min(int(os.environ.get("MONATE_VORAUS", "2")), 2)
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 STATE_FILE = Path("state/last_result.json")
 SHOT_DIR = Path("screenshots")
@@ -174,7 +175,8 @@ def main() -> int:
     for key, txt in results.items():
         if txt.startswith("FEHLER"):
             continue
-        if POSITIV.search(txt) and not NEGATIV.search(txt):
+        # Frei = Ergebnis wurde angezeigt, aber OHNE "Kein Parkplatz mehr ... verfügbar"
+        if txt.strip() and not NEGATIV.search(txt):
             treffer.append(key)
         h = hashlib.sha256(txt.encode()).hexdigest()
         if old.get(key, {}).get("hash") not in (None, h):
@@ -184,8 +186,7 @@ def main() -> int:
         notify(f"🅿️ Parkplatz {OBJEKT} evtl. frei!",
                f"Angebot gefunden für: {', '.join(treffer)}. Schnell ins Portal!")
     elif geaendert:
-        notify(f"Parkportal {OBJEKT}: Ergebnis hat sich geändert",
-               f"Neue Anzeige für {', '.join(geaendert)} – bitte kurz nachschauen.", prio="default")
+        print(f"(Anzeige geändert für {', '.join(geaendert)}, aber weiterhin nichts frei – keine Nachricht)")
     elif first_run and len(fehler_vorab := [k for k, t in results.items() if t.startswith("FEHLER")]) < len(results):
         notify("Parkplatz-Checker läuft ✅",
                "Erster Durchlauf ok. Du bekommst Bescheid, sobald sich etwas tut.", prio="low")
