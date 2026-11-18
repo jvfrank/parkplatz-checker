@@ -78,6 +78,23 @@ def pf_select(page, sel, label: str) -> None:
     page.wait_for_timeout(800)
  
  
+def click_search(page) -> None:
+    """Klickt den sichtbaren Such-Knopf (der Text existiert mehrfach für Handy/Desktop)."""
+    candidates = [
+        page.get_by_role("button", name=re.compile(r"suchen", re.I)),
+        page.locator("button, input[type=submit], a.ui-button").filter(has_text=re.compile(r"suchen", re.I)),
+        page.get_by_text("Parkplatz suchen"),
+        page.get_by_text("Suchen", exact=True),
+    ]
+    for loc in candidates:
+        for i in range(loc.count()):
+            el = loc.nth(i)
+            if el.is_visible():
+                el.click()
+                return
+    raise RuntimeError("Sichtbaren 'Parkplatz suchen'-Knopf nicht gefunden.")
+ 
+ 
 def pick_month_label(mopts: list[str], month: int) -> str:
     for cand in (MONATE[month - 1], f"{month:02d}", str(month)):
         if cand in mopts:
@@ -119,7 +136,7 @@ def search_month(page, year: int, month: int) -> str:
     objekt_sel, opts = select_containing(page, OBJEKT)
     pf_select(page, objekt_sel, next(o for o in opts if o.lower() == OBJEKT.lower()))
  
-    page.get_by_text("Parkplatz suchen", exact=False).first.click()
+    click_search(page)
     page.wait_for_load_state("networkidle", timeout=60000)
     page.wait_for_timeout(3000)  # "Tarife werden abgefragt…" abwarten
  
