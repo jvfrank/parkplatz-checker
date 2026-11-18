@@ -1,0 +1,51 @@
+yaml
+name: Parkplatz-Check
+
+on:
+  schedule:
+    - cron: "*/15 5-21 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Letzten Stand laden
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: parkstate-${{ github.run_id }}
+          restore-keys: parkstate-
+
+      - name: Playwright installieren
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Portal prüfen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          OBJEKT: Klinikum
+          MONATE_VORAUS: "3"
+        run: python check_parking.py
+
+      - name: Stand speichern
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: parkstate-${{ github.run_id }}
+
+      - name: Screenshots hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          retention-days: 3
